@@ -2,7 +2,7 @@
  * API client for communicating with the FastAPI backend
  */
 
-const API_BASE_URL = 'https://py-reqforge.onrender.com';
+const API_BASE_URL = 'https://py-reqforge.onrender.com/api';
 
 export interface PackageSearchResult {
   name: string;
