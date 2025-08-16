@@ -146,6 +146,11 @@ async def root():
         "documentation": "/docs"
     }
 
+@app.get("/health")
+async def simple_health_check():
+    """Simple health check endpoint for Render"""
+    return {"status": "ok"}
+
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint with detailed status"""

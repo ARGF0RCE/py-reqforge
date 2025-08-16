@@ -26,14 +26,14 @@ dist-ssr
 # AI/Claude related files
 CLAUDE.md
 Untitled
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
+# *.png
+# *.jpg
+# *.jpeg
+# *.gif
+# *.webp
 
 # Test/temp files
-requirements.txt
+/requirements.txt
 test_*.txt
 temp_*
 
