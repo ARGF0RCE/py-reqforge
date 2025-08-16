@@ -1,30 +1,32 @@
-# Python Requirements Manager
+# py-reqforge
 
 A powerful, intelligent web application for managing Python project dependencies with advanced features like dependency resolution, hash management, and project templates.
 
 ![React](https://img.shields.io/badge/React-19+-61DAFB.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)
 ![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)
 
 ## 🚀 Overview
 
-Python Requirements Manager is a comprehensive tool designed to streamline Python dependency management. It goes beyond simple text editing by providing intelligent dependency resolution, hash management, project templates, and visual dependency tracking.
+py-reqforge is a comprehensive tool designed to streamline Python dependency management. It goes beyond simple text editing by providing intelligent dependency resolution, hash management, project templates, and visual dependency tracking through a modern React frontend with a FastAPI backend.
 
 ## ✨ Key Features
 
 ### 📁 **File Management**
 
-- **Upload existing requirements.txt** - Support for files with or without hashes
-- **Smart parsing** - Handles various requirement formats and version specifiers
-- **Export functionality** - Generate properly formatted requirements.txt files
-- **Hash preservation** - Maintains existing hashes and generates new ones when needed
+- **Upload existing requirements.txt** - Support for files with or without hashes, environment markers, and package extras
+- **Smart parsing** - Handles various requirement formats, version specifiers, and platform-specific dependencies
+- **Export functionality** - Generate properly formatted requirements.txt files with SHA256 hashes
+- **Hash management** - Fetches and caches SHA256 hashes from PyPI for secure package verification
 
 ### 🔍 **Intelligent Package Management**
 
-- **Package search** - Real-time search through PyPI packages
+- **Package search** - Real-time search through PyPI packages with 3-second debouncing
 - **Version selection** - Choose specific versions with dropdown menus
-- **Dependency resolution** - Automatically resolves and adds required dependencies
+- **Dependency resolution** - Automatically resolves and categorizes main packages vs dependencies
 - **Conflict detection** - Warns about version conflicts and breaking changes
-- **Orphan cleanup** - Removes unused dependencies automatically
+- **Orphan cleanup** - Intelligent removal of unused dependencies when packages are removed
+- **Extras support** - Handles packages with square bracket extras like `torch[gpu]`
 
 ### 🏗️ **Project Templates**
 
@@ -39,10 +41,11 @@ Python Requirements Manager is a comprehensive tool designed to streamline Pytho
 
 ### 🔐 **Advanced Security & Configuration**
 
-- **Hash management** - SHA256 hash generation and validation
+- **Hash management** - SHA256 hash generation and validation from PyPI
 - **Custom package indexes** - Support for private PyPI servers
 - **Dependency tracking** - Visual indicators for main packages vs dependencies
 - **Impact analysis** - Preview what breaks when removing packages
+- **Cache management** - Force refresh cache button with rate limiting
 
 ### 📊 **Visual Interface**
 
@@ -57,27 +60,32 @@ Python Requirements Manager is a comprehensive tool designed to streamline Pytho
 ### **Frontend Framework**
 
 - **React 19+** - Modern React with Hooks for state management
-- **Lucide React** - Beautiful, customizable SVG icons
+- **TypeScript** - Type-safe development with modern TypeScript features
 - **Vite.js** - Fast and lightweight build tool for React applications
-- **Tailwind CSS** - Utility-first CSS framework for responsive design
+- **Tailwind CSS v4** - Utility-first CSS framework for responsive design
+- **Radix UI** - Accessible, unstyled UI components
+- **Lucide React** - Beautiful, customizable SVG icons
 
-### **Core Technologies**
+### **Backend Framework**
 
-- **TypeScript** - Modern TypeScript features
-- **HTML5** - Semantic markup and file handling APIs
-- **CSS3** - Advanced styling with Flexbox and Grid
+- **FastAPI** - Modern, fast web framework for building APIs
+- **Python 3.9+** - Asynchronous Python backend
+- **Prisma ORM** - Type-safe database access and migrations
+- **SQLite** - Lightweight database for caching PyPI data
+- **Uvicorn** - Lightning-fast ASGI server
 
 ### **Package Management APIs**
 
 - **PyPI JSON API** - Real-time package information retrieval
+- **PyPI Simple API** - Package index browsing with PEP 691 JSON support
+- **SHA256 Hash Retrieval** - Secure package verification
 - **Custom Index Support** - Private package repository integration
-- **Hash Generation** - SHA256 cryptographic hash creation
 
 ### **File Processing**
 
 - **FileReader API** - Client-side file upload and parsing
 - **Blob API** - File generation and download functionality
-- **Text Processing** - Requirements.txt parsing and generation
+- **Requirements.txt Parsing** - Intelligent parsing with environment markers and extras
 
 ### **State Management**
 
@@ -89,16 +97,55 @@ Python Requirements Manager is a comprehensive tool designed to streamline Pytho
 
 ### **Prerequisites**
 
-- Node.js 16+ and npm/yarn
-- Modern web browser with ES2020+ support
+- **Node.js 18+** and npm/yarn
+- **Python 3.9+** with pip
+- **Modern web browser** with ES2020+ support
 
-### **Quick Start**
+### **Frontend Setup**
 
-> **To be filled**
+```bash
+# Install dependencies
+npm install
 
-### **Build for Production**
+# Start development server
+npm run dev
 
-> **To be filled**
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### **Backend Setup**
+
+```bash
+# Navigate to API directory
+cd api
+
+# Create virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Generate Prisma client
+prisma generate --schema=schema.prisma
+
+# Setup database
+prisma db push --schema=schema.prisma
+
+# Start API server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### **Full Development Setup**
+
+1. **Start the backend** (port 8000)
+2. **Start the frontend** (port 5173)
+3. **Access the application** at `http://localhost:5173`
+4. **API documentation** available at `http://localhost:8000/docs`
 
 ## 🎯 Usage Guide
 
@@ -140,7 +187,21 @@ Python Requirements Manager is a comprehensive tool designed to streamline Pytho
 
 The app integrates with PyPI's JSON API for real-time package data:
 
-> **To be filled with example API calls**
+```typescript
+// Package search
+GET /api/packages/search?q=numpy
+
+// Package details with versions
+GET /api/packages/numpy
+
+// Dependency resolution
+POST /api/packages/resolve-dependencies
+{
+  "packages": ["numpy==1.24.0", "pandas==2.0.0"],
+  "index_url": "https://pypi.org/simple/",
+  "python_version": "3.9"
+}
+```
 
 ### **Custom Index Support**
 
@@ -149,6 +210,7 @@ Configure custom package indexes for private repositories:
 ```
 https://your-private-pypi.com/simple/
 https://artifactory.company.com/pypi/
+https://pypi.org/simple/
 ```
 
 ## 🏗️ Architecture
@@ -156,23 +218,41 @@ https://artifactory.company.com/pypi/
 ### **Component Structure**
 
 ```
-RequirementsManager/
-├── FileUpload          # Requirements.txt upload handling
-├── ProjectTemplates    # Pre-built project configurations
-├── PackageSearch       # PyPI package search interface
-├── PackageManager      # Add/remove package functionality
-├── DependencyTree      # Visual dependency relationships
-├── SettingsPanel       # Configuration options
-└── ExportManager       # Requirements.txt generation
+frontend/
+├── components/
+│   ├── FileUpload/         # Requirements.txt upload handling
+│   ├── ProjectTemplates/   # Pre-built project configurations
+│   ├── PackageSearch/      # PyPI package search interface
+│   ├── PackageManager/     # Add/remove package functionality
+│   ├── DependencyTree/     # Visual dependency relationships
+│   ├── SettingsPanel/      # Configuration options
+│   ├── ExportManager/      # Requirements.txt generation
+│   └── ui/                 # Radix UI components
+└── api/
+    ├── services/
+    │   ├── package_service.py  # Core package operations
+    │   ├── cache_service.py    # Prisma database caching
+    │   └── pypi_client.py     # PyPI API integration
+    ├── schema.prisma           # Database schema
+    └── main.py                 # FastAPI application
 ```
 
 ### **State Management**
 
-- **packages[]** - Current project packages
+**Frontend State (React)**:
+
+- **packages[]** - Current project packages with dependency flags
 - **dependencyTree{}** - Package relationship mapping
 - **packageInfo{}** - Selected package metadata
 - **warnings[]** - Conflict and breaking change alerts
 - **settings{}** - User preferences and configuration
+
+**Backend State (FastAPI + Prisma)**:
+
+- **Package cache** - PyPI package metadata with TTL
+- **Version cache** - Package versions with SHA256 hashes
+- **Dependency cache** - Resolved dependency trees
+- **Search cache** - PyPI search results optimization
 
 ## 🎨 UI/UX Features
 
@@ -214,6 +294,7 @@ RequirementsManager/
 
 ### **Planned Features**
 
+- **PEP 508 Support** - Full dependency specification compliance with extras validation
 - **Virtual environment integration** - Direct pip install capabilities
 - **Git integration** - Commit changes to version control
 - **Package vulnerability scanning** - Security audit integration
@@ -225,10 +306,10 @@ RequirementsManager/
 
 ### **API Enhancements**
 
-- **Real PyPI API integration** - Replace mock data with live API calls
-- **Caching layer** - Improve performance with intelligent caching
+- **Enhanced caching strategies** - Smarter cache invalidation and refresh
 - **Offline mode** - Local package database for offline usage
 - **Custom metadata** - Add project-specific package annotations
+- **Webhook support** - Real-time PyPI update notifications
 
 ## 📋 Requirements
 
@@ -257,7 +338,29 @@ We welcome contributions! Please see our contributing guidelines:
 
 ### **Development Setup**
 
-> **To be filled with setup instructions**
+```bash
+# Clone the repository
+git clone https://github.com/ARGF0RCE/py-reqforge.git
+cd py-reqforge
+
+# Setup frontend
+npm install
+npm run dev  # Runs on port 5173
+
+# Setup backend (in another terminal)
+cd api
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+prisma generate --schema=schema.prisma
+prisma db push --schema=schema.prisma
+uvicorn main:app --reload --port 8000
+
+# Run linting and type checking
+npm run lint
+npm run type-check
+npm run format
+```
 
 ## 📄 License
 
@@ -273,10 +376,10 @@ This project is licensed under the Apache 2.0 - see the [LICENSE](LICENSE) file 
 
 ## 📞 Support
 
-- **Documentation**: [Wiki](https://github.com/your-username/python-requirements-manager/wiki)
-- **Issues**: [GitHub Issues](https://github.com/your-username/python-requirements-manager/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/python-requirements-manager/discussions)
-- **Email**: support@requirements-manager.com
+- **Documentation**: [Wiki](https://github.com/ARGF0RCE/py-reqforge/wiki)
+- **Issues**: [GitHub Issues](https://github.com/ARGF0RCE/py-reqforge/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ARGF0RCE/py-reqforge/discussions)
+- **Repository**: [GitHub](https://github.com/ARGF0RCE/py-reqforge)
 
 ---
 
