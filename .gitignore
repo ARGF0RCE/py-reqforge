@@ -22,3 +22,29 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# AI/Claude related files
+CLAUDE.md
+Untitled
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+
+# Test/temp files
+requirements.txt
+test_*.txt
+temp_*
+
+# Python virtual environments (for backend)
+api/.venv/
+api/__pycache__/
+api/**/__pycache__/
+api/*.pyc
+api/.env
+api/pypi_cache.db
+api/pypi_cache.db-journal
+
+# Prisma generated files
+api/generated/

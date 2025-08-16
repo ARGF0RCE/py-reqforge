@@ -1,4 +1,15 @@
 import { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Folder, Code, Eye, CheckCircle2 } from 'lucide-react';
 
 interface Template {
   id: string;
@@ -9,7 +20,7 @@ interface Template {
 }
 
 interface ProjectTemplatesProps {
-  onTemplateSelect: (packages: string[]) => void;
+  onTemplateSelect: (packages: string[]) => void | Promise<void>;
 }
 
 const templates: Template[] = [
@@ -102,6 +113,7 @@ export default function ProjectTemplates({
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(
     null
   );
+  const [isApplying, setIsApplying] = useState<string | null>(null);
 
   const categories = [
     'All',
@@ -113,113 +125,172 @@ export default function ProjectTemplates({
       ? templates
       : templates.filter(t => t.category === selectedCategory);
 
-  const handleTemplateApply = (template: Template) => {
-    onTemplateSelect(template.packages);
-    setSelectedTemplate(null);
+  const handleTemplateApply = async (template: Template) => {
+    if (isApplying === template.id) return; // Prevent duplicate calls
+
+    setIsApplying(template.id);
+    try {
+      await onTemplateSelect(template.packages);
+      setSelectedTemplate(null);
+    } catch (error) {
+      console.error('Failed to apply template:', error);
+    } finally {
+      setIsApplying(null);
+    }
   };
 
   return (
-    <div className="bg-gradient-templates p-6 rounded-lg">
-      <h2 className="text-xl font-semibold text-white mb-4">
-        Project Templates
-      </h2>
-
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2">
+    <Card className="w-full bg-zinc-900 border-zinc-800 h-fit">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-gray-100 text-lg font-bold">
+          <Folder className="h-5 w-5" />
+          Templates
+        </CardTitle>
+        <CardDescription className="text-gray-400 text-sm">
+          Quick start with pre-configured packages
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
           {categories.map(category => (
-            <button
+            <Button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`px-3 py-1 rounded-full text-sm transition-colors ${
+              variant={selectedCategory === category ? 'default' : 'ghost'}
+              size="sm"
+              className={`w-full justify-start text-sm ${
                 selectedCategory === category
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'text-gray-300 hover:bg-zinc-700 hover:text-gray-100'
               }`}
             >
               {category}
-            </button>
+            </Button>
           ))}
         </div>
-      </div>
 
-      <div className="grid gap-3 max-h-96 overflow-y-auto">
-        {filteredTemplates.map(template => (
-          <div
-            key={template.id}
-            className="bg-white/10 backdrop-blur-sm p-4 rounded-lg border border-white/20 hover:bg-white/20 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-medium text-white">{template.name}</h3>
-              <span className="text-xs bg-blue-500/30 text-blue-200 px-2 py-1 rounded">
-                {template.category}
-              </span>
-            </div>
+        <ScrollArea className="h-[600px] w-full rounded-md border border-zinc-700 p-2">
+          <div className="space-y-3">
+            {filteredTemplates.map(template => (
+              <Card
+                key={template.id}
+                className="bg-zinc-800/50 border-zinc-700/50 hover:bg-zinc-700/50 transition-all duration-200"
+              >
+                <CardContent className="p-3">
+                  <div className="space-y-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-100 text-sm leading-tight">
+                        {template.name}
+                      </h3>
+                      <Badge
+                        variant="outline"
+                        className="border-zinc-600 text-zinc-400 text-xs mt-1"
+                      >
+                        {template.category}
+                      </Badge>
+                    </div>
 
-            <p className="text-blue-200 text-sm mb-3">{template.description}</p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      {template.description}
+                    </p>
 
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-blue-300">
-                {template.packages.length} packages
-              </span>
+                    <div className="flex justify-between items-center pt-1">
+                      <div className="flex items-center gap-1">
+                        <Code className="h-3 w-3 text-gray-500" />
+                        <span className="text-xs text-gray-500 mono">
+                          {template.packages.length} pkgs
+                        </span>
+                      </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedTemplate(template)}
-                  className="text-xs bg-blue-500/20 text-blue-200 px-3 py-1 rounded hover:bg-blue-500/30 transition-colors"
-                >
-                  Preview
-                </button>
-                <button
-                  onClick={() => handleTemplateApply(template)}
-                  className="text-xs bg-green-500/20 text-green-200 px-3 py-1 rounded hover:bg-green-500/30 transition-colors"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {selectedTemplate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gradient-primary p-6 rounded-lg max-w-md w-full">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              {selectedTemplate.name}
-            </h3>
-            <p className="text-blue-200 mb-4">{selectedTemplate.description}</p>
-
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-white mb-2">Packages:</h4>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {selectedTemplate.packages.map((pkg, index) => (
-                  <div
-                    key={index}
-                    className="text-sm text-blue-200 bg-white/10 px-2 py-1 rounded"
-                  >
-                    {pkg}
+                      <div className="flex gap-1">
+                        <Button
+                          onClick={() => setSelectedTemplate(template)}
+                          size="sm"
+                          variant="outline"
+                          className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white text-xs px-2 h-6"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          onClick={() => handleTemplateApply(template)}
+                          size="sm"
+                          disabled={isApplying === template.id}
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs px-2 h-6 disabled:opacity-50"
+                        >
+                          {isApplying === template.id ? (
+                            <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setSelectedTemplate(null)}
-                className="px-4 py-2 bg-gray-500/20 text-gray-200 rounded hover:bg-gray-500/30 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleTemplateApply(selectedTemplate)}
-                className="px-4 py-2 bg-green-500/20 text-green-200 rounded hover:bg-green-500/30 transition-colors"
-              >
-                Apply Template
-              </button>
-            </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
-      )}
-    </div>
+        </ScrollArea>
+
+        {selectedTemplate && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+            <Card className="bg-zinc-900 border-zinc-700 max-w-2xl w-full max-h-[90vh] overflow-hidden">
+              <CardHeader>
+                <CardTitle className="text-gray-100 text-lg font-bold mono">
+                  {selectedTemplate.name}
+                </CardTitle>
+                <CardDescription className="text-gray-400 italic">
+                  {selectedTemplate.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-6">
+                  <h4 className="text-sm font-bold text-gray-200 mb-3 flex items-center gap-2">
+                    <Code className="h-4 w-4" />
+                    Packages ({selectedTemplate.packages.length}):
+                  </h4>
+                  <ScrollArea className="h-40 w-full rounded-md border border-zinc-700 p-3">
+                    <div className="space-y-2">
+                      {selectedTemplate.packages.map((pkg, index) => (
+                        <div
+                          key={index}
+                          className="text-sm text-gray-300 bg-zinc-800 px-3 py-2 rounded mono border border-zinc-700"
+                        >
+                          {pkg}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    onClick={() => setSelectedTemplate(null)}
+                    variant="outline"
+                    className="border-zinc-600 text-gray-300 hover:bg-zinc-700"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => handleTemplateApply(selectedTemplate)}
+                    disabled={isApplying === selectedTemplate?.id}
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-50"
+                  >
+                    {isApplying === selectedTemplate?.id ? (
+                      <div className="h-4 w-4 mr-2 animate-spin rounded-full border border-white border-t-transparent" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    )}
+                    {isApplying === selectedTemplate?.id
+                      ? 'Applying...'
+                      : 'Apply Template'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

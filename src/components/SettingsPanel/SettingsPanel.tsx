@@ -1,4 +1,28 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import {
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  X,
+  Zap,
+  Code,
+  RotateCcw,
+  RefreshCw,
+} from 'lucide-react';
+import { apiClient } from '../../api/client';
 
 interface Settings {
   includeHashes: boolean;
@@ -21,6 +45,8 @@ export default function SettingsPanel({
   const [customIndexInput, setCustomIndexInput] = useState(
     settings.customIndex
   );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<number | null>(null);
 
   const handleSettingChange = useCallback(
     (key: keyof Settings, value: Settings[keyof Settings]) => {
@@ -40,199 +66,301 @@ export default function SettingsPanel({
     setCustomIndexInput(settings.customIndex);
   }, [settings.customIndex]);
 
+  const handleRefreshCache = useCallback(async () => {
+    const now = Date.now();
+    const oneMinute = 60 * 1000;
+
+    // Check if 1 minute has passed since last refresh
+    if (lastRefresh && now - lastRefresh < oneMinute) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const result = await apiClient.refreshCache();
+      console.log('Cache refresh result:', result);
+
+      setLastRefresh(now);
+
+      // Keep the button disabled for 1 minute
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, oneMinute);
+    } catch (error) {
+      console.error('Cache refresh failed:', error);
+      setIsRefreshing(false);
+    }
+  }, [lastRefresh]);
+
+  // Calculate remaining time for button to be enabled
+  const getRemainingTime = useCallback(() => {
+    if (!lastRefresh) return 0;
+    const elapsed = Date.now() - lastRefresh;
+    const oneMinute = 60 * 1000;
+    return Math.max(0, oneMinute - elapsed);
+  }, [lastRefresh]);
+
+  const [remainingTime, setRemainingTime] = useState(0);
+
+  // Update remaining time every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRemainingTime(getRemainingTime());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [getRemainingTime]);
+
+  const canRefresh = !isRefreshing && remainingTime === 0;
+
   return (
-    <div className="bg-gradient-settings p-6 rounded-lg">
-      <div
-        className="flex items-center justify-between cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <h2 className="text-xl font-semibold text-white">Settings</h2>
-        <span className="text-blue-400 text-sm">{isExpanded ? '▼' : '▶'}</span>
-      </div>
+    <div className="container">
+      <Card className="w-full bg-zinc-900 border-zinc-800">
+        <CardHeader
+          className="cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <CardTitle className="flex items-center justify-between text-gray-100 text-xl font-bold">
+            <div className="flex items-center gap-2">
+              <Settings className="h-6 w-6" />
+              Settings
+            </div>
+            {isExpanded ? (
+              <ChevronDown className="h-5 w-5 text-blue-400" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-blue-400" />
+            )}
+          </CardTitle>
+          <CardDescription className="text-gray-400 text-base">
+            Configure package management and export options
+          </CardDescription>
+        </CardHeader>
 
-      {isExpanded && (
-        <div className="mt-4 space-y-4">
-          <div className="grid gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-white font-medium">Include Hashes</label>
-                <p className="text-sm text-blue-200">
-                  Generate SHA256 hashes for packages
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+        {isExpanded && (
+          <CardContent className="space-y-6">
+            <div className="grid gap-6">
+              <div className="flex items-center justify-between p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+                <div className="space-y-1">
+                  <Label className="text-gray-100 font-semibold text-base">
+                    Include Hashes
+                  </Label>
+                  <p className="text-sm text-gray-400">
+                    Generate <span className="mono text-amber-400">SHA256</span>{' '}
+                    hashes for packages
+                  </p>
+                </div>
+                <Switch
                   checked={settings.includeHashes}
-                  onChange={e =>
-                    handleSettingChange('includeHashes', e.target.checked)
+                  onCheckedChange={checked =>
+                    handleSettingChange('includeHashes', checked)
                   }
-                  className="sr-only peer"
+                  className="data-[state=checked]:bg-blue-600"
                 />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-white font-medium">
-                  Auto-resolve Dependencies
-                </label>
-                <p className="text-sm text-blue-200">
-                  Automatically add required dependencies
-                </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
+
+              <div className="flex items-center justify-between p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+                <div className="space-y-1">
+                  <Label className="text-gray-100 font-semibold text-base">
+                    Auto-resolve Dependencies
+                  </Label>
+                  <p className="text-sm text-gray-400">
+                    Automatically add required dependencies
+                  </p>
+                </div>
+                <Switch
                   checked={settings.autoResolve}
-                  onChange={e =>
-                    handleSettingChange('autoResolve', e.target.checked)
+                  onCheckedChange={checked =>
+                    handleSettingChange('autoResolve', checked)
                   }
-                  className="sr-only peer"
+                  className="data-[state=checked]:bg-blue-600"
                 />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+                <div className="space-y-1">
+                  <Label className="text-gray-100 font-semibold text-base">
+                    Show Dependencies
+                  </Label>
+                  <p className="text-sm text-gray-400">
+                    Display dependency packages in list
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.showDependencies}
+                  onCheckedChange={checked =>
+                    handleSettingChange('showDependencies', checked)
+                  }
+                  className="data-[state=checked]:bg-blue-600"
+                />
+              </div>
+
+              <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-gray-100 font-semibold text-base">
+                    Export Format
+                  </Label>
+                  <p className="text-sm text-gray-400">
+                    Choose how version constraints are formatted
+                  </p>
+                </div>
+                <select
+                  value={settings.exportFormat}
+                  onChange={e =>
+                    handleSettingChange(
+                      'exportFormat',
+                      e.target.value as Settings['exportFormat']
+                    )
+                  }
+                  className="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-3 py-2 text-gray-200 mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="standard" className="bg-zinc-800">
+                    Standard (package==version)
+                  </option>
+                  <option value="pinned" className="bg-zinc-800">
+                    Pinned (package&gt;=version)
+                  </option>
+                  <option value="loose" className="bg-zinc-800">
+                    Loose (package)
+                  </option>
+                </select>
+              </div>
+
+              <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-gray-100 font-semibold text-base">
+                    Custom Package Index
+                  </Label>
+                  <p className="text-sm text-gray-400">
+                    URL for private package repository
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <Input
+                    type="url"
+                    value={customIndexInput}
+                    onChange={e => setCustomIndexInput(e.target.value)}
+                    placeholder="https://your-private-pypi.com/simple/"
+                    className="bg-zinc-900 border-zinc-600 text-gray-200 placeholder:text-gray-500 mono focus:border-blue-500"
+                  />
+
+                  {customIndexInput !== settings.customIndex && (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleCustomIndexSave}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Save
+                      </Button>
+                      <Button
+                        onClick={handleCustomIndexCancel}
+                        size="sm"
+                        variant="outline"
+                        className="border-zinc-600 text-gray-300 hover:bg-zinc-700"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-white font-medium">
-                  Show Dependencies
-                </label>
-                <p className="text-sm text-blue-200">
-                  Display dependency packages in list
+            <Separator className="bg-zinc-700" />
+
+            <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700 space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-gray-100">
+                  Quick Actions
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Apply preset configurations for common use cases
                 </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.showDependencies}
-                  onChange={e =>
-                    handleSettingChange('showDependencies', e.target.checked)
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={() =>
+                    onSettingsChange({
+                      includeHashes: true,
+                      customIndex: '',
+                      autoResolve: true,
+                      showDependencies: true,
+                      exportFormat: 'standard',
+                    })
                   }
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
-
-            <div>
-              <label className="text-white font-medium block mb-2">
-                Export Format
-              </label>
-              <select
-                value={settings.exportFormat}
-                onChange={e =>
-                  handleSettingChange(
-                    'exportFormat',
-                    e.target.value as Settings['exportFormat']
-                  )
-                }
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-              >
-                <option value="standard" className="bg-gray-800">
-                  Standard (package==version)
-                </option>
-                <option value="pinned" className="bg-gray-800">
-                  Pinned (package{'>'}=version)
-                </option>
-                <option value="loose" className="bg-gray-800">
-                  Loose (package)
-                </option>
-              </select>
-              <p className="text-sm text-blue-200 mt-1">
-                Choose how version constraints are formatted
-              </p>
-            </div>
-
-            <div>
-              <label className="text-white font-medium block mb-2">
-                Custom Package Index
-              </label>
-              <div className="space-y-2">
-                <input
-                  type="url"
-                  value={customIndexInput}
-                  onChange={e => setCustomIndexInput(e.target.value)}
-                  placeholder="https://your-private-pypi.com/simple/"
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-
-                {customIndexInput !== settings.customIndex && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCustomIndexSave}
-                      className="px-3 py-1 bg-green-500/20 text-green-200 rounded hover:bg-green-500/30 transition-colors text-sm"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={handleCustomIndexCancel}
-                      className="px-3 py-1 bg-gray-500/20 text-gray-200 rounded hover:bg-gray-500/30 transition-colors text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
+                >
+                  <Zap className="h-3 w-3 mr-1" />
+                  Production Ready
+                </Button>
+                <Button
+                  onClick={() =>
+                    onSettingsChange({
+                      includeHashes: false,
+                      customIndex: '',
+                      autoResolve: true,
+                      showDependencies: false,
+                      exportFormat: 'loose',
+                    })
+                  }
+                  variant="outline"
+                  size="sm"
+                  className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white"
+                >
+                  <Code className="h-3 w-3 mr-1" />
+                  Development
+                </Button>
+                <Button
+                  onClick={() =>
+                    onSettingsChange({
+                      includeHashes: false,
+                      customIndex: '',
+                      autoResolve: false,
+                      showDependencies: false,
+                      exportFormat: 'standard',
+                    })
+                  }
+                  variant="outline"
+                  size="sm"
+                  className="border-zinc-600 text-gray-300 hover:bg-zinc-700"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Reset
+                </Button>
+                <Button
+                  onClick={handleRefreshCache}
+                  disabled={!canRefresh}
+                  variant="outline"
+                  size="sm"
+                  className={`border-orange-600 text-orange-400 hover:bg-orange-600 hover:text-white ${
+                    !canRefresh ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  title={
+                    isRefreshing
+                      ? 'Refreshing cache...'
+                      : remainingTime > 0
+                        ? `Wait ${Math.ceil(remainingTime / 1000)}s before refreshing again`
+                        : 'Refresh package cache to get latest dependency data'
+                  }
+                >
+                  <RefreshCw
+                    className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`}
+                  />
+                  {isRefreshing
+                    ? 'Refreshing...'
+                    : remainingTime > 0
+                      ? `Wait ${Math.ceil(remainingTime / 1000)}s`
+                      : 'Refresh Cache'}
+                </Button>
               </div>
-              <p className="text-sm text-blue-200 mt-1">
-                URL for private package repository
-              </p>
             </div>
-          </div>
-
-          <div className="pt-4 border-t border-white/20">
-            <h3 className="text-lg font-medium text-white mb-2">
-              Quick Actions
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() =>
-                  onSettingsChange({
-                    includeHashes: true,
-                    customIndex: '',
-                    autoResolve: true,
-                    showDependencies: true,
-                    exportFormat: 'standard',
-                  })
-                }
-                className="px-3 py-1 bg-blue-500/20 text-blue-200 rounded hover:bg-blue-500/30 transition-colors text-sm"
-              >
-                Production Ready
-              </button>
-              <button
-                onClick={() =>
-                  onSettingsChange({
-                    includeHashes: false,
-                    customIndex: '',
-                    autoResolve: true,
-                    showDependencies: false,
-                    exportFormat: 'loose',
-                  })
-                }
-                className="px-3 py-1 bg-green-500/20 text-green-200 rounded hover:bg-green-500/30 transition-colors text-sm"
-              >
-                Development
-              </button>
-              <button
-                onClick={() =>
-                  onSettingsChange({
-                    includeHashes: false,
-                    customIndex: '',
-                    autoResolve: false,
-                    showDependencies: false,
-                    exportFormat: 'standard',
-                  })
-                }
-                className="px-3 py-1 bg-gray-500/20 text-gray-200 rounded hover:bg-gray-500/30 transition-colors text-sm"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 }

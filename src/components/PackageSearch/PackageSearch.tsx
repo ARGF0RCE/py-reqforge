@@ -1,104 +1,97 @@
 import { useState, useCallback, useEffect } from 'react';
-
-interface PackageInfo {
-  name: string;
-  version: string;
-  description: string;
-  author: string;
-  license: string;
-  homepage: string;
-  versions: string[];
-}
+import {
+  apiClient,
+  PackageSearchResult,
+  PackageDetails,
+} from '../../api/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ExternalLink, Search } from 'lucide-react';
 
 interface PackageSearchProps {
-  onPackageSelect: (packageName: string, version: string) => void;
+  onPackageSelect: (
+    packageName: string,
+    version: string
+  ) => void | Promise<void>;
+  indexUrl?: string;
 }
 
-export default function PackageSearch({ onPackageSelect }: PackageSearchProps) {
+export default function PackageSearch({
+  onPackageSelect,
+  indexUrl,
+}: PackageSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<PackageInfo[]>([]);
-  const [selectedPackage, setSelectedPackage] = useState<PackageInfo | null>(
+  const [searchResults, setSearchResults] = useState<PackageSearchResult[]>([]);
+  const [selectedPackage, setSelectedPackage] = useState<PackageDetails | null>(
     null
   );
   const [selectedVersion, setSelectedVersion] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-
-  const mockSearch = useCallback(
-    async (term: string): Promise<PackageInfo[]> => {
-      const mockPackages = [
-        {
-          name: 'requests',
-          version: '2.31.0',
-          description: 'Python HTTP for Humans.',
-          author: 'Kenneth Reitz',
-          license: 'Apache 2.0',
-          homepage: 'https://requests.readthedocs.io',
-          versions: ['2.31.0', '2.30.0', '2.29.0', '2.28.2'],
-        },
-        {
-          name: 'flask',
-          version: '2.3.3',
-          description:
-            'A simple framework for building complex web applications.',
-          author: 'Armin Ronacher',
-          license: 'BSD-3-Clause',
-          homepage: 'https://palletsprojects.com/p/flask',
-          versions: ['2.3.3', '2.3.2', '2.3.1', '2.2.5'],
-        },
-        {
-          name: 'django',
-          version: '4.2.5',
-          description: 'A high-level Python Web framework.',
-          author: 'Django Software Foundation',
-          license: 'BSD-3-Clause',
-          homepage: 'https://www.djangoproject.com',
-          versions: ['4.2.5', '4.2.4', '4.1.12', '3.2.21'],
-        },
-      ];
-
-      return mockPackages.filter(
-        pkg =>
-          pkg.name.toLowerCase().includes(term.toLowerCase()) ||
-          pkg.description.toLowerCase().includes(term.toLowerCase())
-      );
-    },
-    []
-  );
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = useCallback(async () => {
-    if (!searchTerm.trim()) {
+    if (!searchTerm.trim() || searchTerm.length < 2) {
       setSearchResults([]);
       return;
     }
 
     setIsSearching(true);
+    setError(null);
     try {
-      const results = await mockSearch(searchTerm);
+      const results = await apiClient.searchPackages(searchTerm, indexUrl, 10);
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
+      setError(error instanceof Error ? error.message : 'Search failed');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, [searchTerm, mockSearch]);
+  }, [searchTerm, indexUrl]);
 
   useEffect(() => {
-    const timeoutId = setTimeout(handleSearch, 300);
+    const timeoutId = setTimeout(handleSearch, 3000); // 3 second delay
     return () => clearTimeout(timeoutId);
   }, [handleSearch]);
 
-  const handlePackageClick = useCallback(async (pkg: PackageInfo) => {
-    setIsLoadingDetails(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setSelectedPackage(pkg);
-      setSelectedVersion(pkg.version);
-    } finally {
-      setIsLoadingDetails(false);
-    }
-  }, []);
+  const handlePackageClick = useCallback(
+    async (pkg: PackageSearchResult) => {
+      setIsLoadingDetails(true);
+      setError(null);
+      try {
+        const packageDetails = await apiClient.getPackageDetails(
+          pkg.name,
+          indexUrl,
+          true,
+          true
+        );
+        setSelectedPackage(packageDetails);
+        setSelectedVersion(packageDetails.latest_version);
+      } catch (error) {
+        console.error('Failed to load package details:', error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load package details'
+        );
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    },
+    [indexUrl]
+  );
 
   const handleAddPackage = useCallback(() => {
     if (selectedPackage && selectedVersion) {
@@ -111,122 +104,218 @@ export default function PackageSearch({ onPackageSelect }: PackageSearchProps) {
   }, [selectedPackage, selectedVersion, onPackageSelect]);
 
   return (
-    <div className="bg-gradient-search p-6 rounded-lg">
-      <h2 className="text-xl font-semibold text-white mb-4">Package Search</h2>
-
-      <div className="mb-4">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          placeholder="Search PyPI packages..."
-          className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
-      </div>
-
-      {isSearching && (
-        <div className="text-center text-blue-300 py-4">
-          Searching packages...
-        </div>
-      )}
-
-      {searchResults.length > 0 && (
-        <div className="mb-4 max-h-60 overflow-y-auto">
-          <h3 className="text-sm font-medium text-white mb-2">
-            Search Results
-          </h3>
-          <div className="space-y-2">
-            {searchResults.map(pkg => (
-              <div
-                key={pkg.name}
-                onClick={() => handlePackageClick(pkg)}
-                className="bg-white/10 backdrop-blur-sm p-3 rounded-lg border border-white/20 cursor-pointer hover:bg-white/20 transition-colors"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-white">{pkg.name}</h4>
-                    <p className="text-sm text-blue-200">{pkg.description}</p>
-                  </div>
-                  <span className="text-xs bg-blue-500/30 text-blue-200 px-2 py-1 rounded">
-                    v{pkg.version}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedPackage && (
-        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-lg border border-white/20">
-          {isLoadingDetails ? (
-            <div className="text-center text-blue-300 py-4">
-              Loading package details...
-            </div>
-          ) : (
-            <>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                {selectedPackage.name}
-              </h3>
-
-              <div className="space-y-2 mb-4">
-                <p className="text-blue-200">{selectedPackage.description}</p>
-                <div className="text-sm text-blue-300">
-                  <p>Author: {selectedPackage.author}</p>
-                  <p>License: {selectedPackage.license}</p>
-                  {selectedPackage.homepage && (
-                    <p>
-                      Homepage:{' '}
-                      <a
-                        href={selectedPackage.homepage}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline"
-                      >
-                        {selectedPackage.homepage}
-                      </a>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 mb-4">
-                <label className="text-sm text-white">Version:</label>
-                <select
-                  value={selectedVersion}
-                  onChange={e => setSelectedVersion(e.target.value)}
-                  className="bg-white/10 border border-white/20 rounded px-3 py-1 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                >
-                  {selectedPackage.versions.map(version => (
-                    <option
-                      key={version}
-                      value={version}
-                      className="bg-gray-800"
-                    >
-                      {version}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedPackage(null)}
-                  className="px-4 py-2 bg-gray-500/20 text-gray-200 rounded hover:bg-gray-500/30 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddPackage}
-                  className="px-4 py-2 bg-green-500/20 text-green-200 rounded hover:bg-green-500/30 transition-colors"
-                >
-                  Add Package
-                </button>
-              </div>
-            </>
+    <Card className="w-full bg-zinc-900 border-zinc-800">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-gray-100 text-xl font-bold">
+          <Search className="h-6 w-6" />
+          Package Search
+        </CardTitle>
+        <CardDescription className="text-gray-400 text-base">
+          Search PyPI packages - type at least 2 characters to start searching
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="relative">
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search PyPI packages..."
+            className="w-full bg-zinc-800 border-zinc-600 text-gray-200 placeholder:text-gray-500 text-base"
+          />
+          {searchTerm.length > 0 && searchTerm.length < 2 && (
+            <p className="text-sm text-gray-500 mt-1">
+              Type at least 2 characters to search
+            </p>
           )}
         </div>
-      )}
-    </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {isSearching && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">Searching packages...</p>
+            <Skeleton className="h-4 w-full bg-zinc-700" />
+            <Skeleton className="h-4 w-3/4 bg-zinc-700" />
+          </div>
+        )}
+
+        {searchResults.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold mb-2 text-gray-100">
+              Search Results{' '}
+              <span className="text-blue-400">({searchResults.length})</span>
+            </h3>
+            <ScrollArea className="h-48 w-full rounded-md border border-zinc-700 p-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {searchResults.map(pkg => (
+                  <Card
+                    key={pkg.name}
+                    className="cursor-pointer hover:bg-zinc-800/50 transition-all duration-200 bg-zinc-900/50 border-zinc-700/50 hover:border-zinc-600/50 h-fit"
+                    onClick={() => handlePackageClick(pkg)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-semibold text-gray-200 mono text-sm truncate">
+                            {pkg.name}
+                          </h4>
+                          <Badge
+                            variant="secondary"
+                            className="bg-zinc-700/50 text-zinc-300 mono text-xs shrink-0"
+                          >
+                            v{pkg.version}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+                          {pkg.summary ||
+                            pkg.description ||
+                            'No description available'}
+                        </p>
+                        {pkg.author && (
+                          <p className="text-xs text-gray-500 truncate">
+                            by{' '}
+                            <span className="text-gray-400">{pkg.author}</span>
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {selectedPackage && (
+          <Card className="bg-zinc-800 border-zinc-700">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-gray-100">
+                <span className="mono text-lg font-bold">
+                  {selectedPackage.name}
+                </span>
+                <Badge
+                  variant="outline"
+                  className="border-zinc-600 text-zinc-300"
+                >
+                  Package Details
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDetails ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-full bg-zinc-700" />
+                  <Skeleton className="h-4 w-3/4 bg-zinc-700" />
+                  <Skeleton className="h-8 w-1/3 bg-zinc-700" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-gray-400 italic text-base">
+                      {selectedPackage.summary || selectedPackage.description}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
+                    {selectedPackage.author && (
+                      <div>
+                        <span className="font-semibold text-gray-200">
+                          Author:
+                        </span>{' '}
+                        <span className="text-gray-300">
+                          {selectedPackage.author}
+                        </span>
+                      </div>
+                    )}
+                    {selectedPackage.license && (
+                      <div>
+                        <span className="font-semibold text-gray-200">
+                          License:
+                        </span>{' '}
+                        <span className="text-yellow-400 mono">
+                          {selectedPackage.license}
+                        </span>
+                      </div>
+                    )}
+                    {selectedPackage.requires_python && (
+                      <div>
+                        <span className="font-semibold text-gray-200">
+                          Requires Python:
+                        </span>{' '}
+                        <span className="text-purple-400 mono">
+                          {selectedPackage.requires_python}
+                        </span>
+                      </div>
+                    )}
+                    {selectedPackage.homepage && (
+                      <div>
+                        <span className="font-semibold text-gray-200">
+                          Homepage:
+                        </span>{' '}
+                        <a
+                          href={selectedPackage.homepage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center gap-1 break-all"
+                        >
+                          {selectedPackage.homepage}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-semibold text-gray-200">
+                      Version:
+                    </label>
+                    <select
+                      value={selectedVersion}
+                      onChange={e => setSelectedVersion(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-zinc-600 bg-zinc-800 px-3 py-1 text-sm text-gray-200 mono shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {selectedPackage.versions?.map(versionInfo => (
+                        <option
+                          key={versionInfo.version}
+                          value={versionInfo.version}
+                        >
+                          {versionInfo.version}
+                          {versionInfo.yanked && ' (yanked)'}
+                        </option>
+                      )) || (
+                        <option value={selectedPackage.latest_version}>
+                          {selectedPackage.latest_version}
+                        </option>
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedPackage(null)}
+                      className="border-zinc-600 text-gray-300 hover:bg-zinc-700 hover:text-gray-100"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleAddPackage}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                    >
+                      Add Package
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </CardContent>
+    </Card>
   );
 }

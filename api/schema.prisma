@@ -1,0 +1,101 @@
+// Prisma schema for PyPI package caching
+generator client {
+  provider = "prisma-client-py"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./pypi_cache.db"
+}
+
+model Package {
+  id              String   @id // Package name (unique identifier)
+  name            String   @unique
+  summary         String?
+  description     String?
+  author          String?
+  authorEmail     String?
+  maintainer      String?
+  maintainerEmail String?
+  license         String?
+  homepage        String?
+  projectUrls     String?  // JSON string for project URLs
+  keywords        String?  // Comma-separated keywords
+  classifiers     String?  // JSON string array of classifiers
+  requiresPython  String?
+  lastUpdated     DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  versions        Version[]
+  dependencies    Dependency[]
+  
+  @@map("packages")
+}
+
+model Version {
+  id          String   @id @default(cuid())
+  packageId   String
+  version     String
+  releaseDate DateTime?
+  yanked      Boolean  @default(false)
+  
+  // Version-specific metadata
+  summary     String?
+  description String?
+  author      String?
+  license     String?
+  homepage    String?
+  
+  // File information
+  files       String?  // JSON string array of file objects (wheels, tarballs)
+  sha256Hash  String?  // Primary SHA256 hash for this version (usually from wheel file)
+  
+  // Dependencies for this version
+  requires    String?  // JSON string array of dependency specifications
+  
+  // Timestamps
+  lastUpdated DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  package     Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  
+  @@unique([packageId, version])
+  @@map("versions")
+}
+
+model Dependency {
+  id                String  @id @default(cuid())
+  packageId         String
+  dependencyName    String
+  versionSpec       String? // e.g., ">=1.0.0,<2.0.0"
+  optional          Boolean @default(false)
+  extra             String? // Optional dependency group
+  
+  // Relations
+  package           Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  
+  @@unique([packageId, dependencyName, extra])
+  @@map("dependencies")
+}
+
+model IndexCache {
+  id          String   @id @default(cuid())
+  indexUrl    String   @unique // The index URL (e.g., "https://pypi.org/simple/")
+  lastFetched DateTime
+  packageList String   // JSON string array of package names from the index
+  
+  @@map("index_cache")
+}
+
+model SearchCache {
+  id          String   @id @default(cuid())
+  query       String   @unique
+  results     String   // JSON string cached search results
+  lastUpdated DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  
+  @@map("search_cache")
+}
