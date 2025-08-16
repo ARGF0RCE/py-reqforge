@@ -4,8 +4,8 @@ services:
     runtime: python
     region: oregon
     plan: free
-    buildCommand: cd api && pip install -r requirements.txt && prisma generate --schema=schema.prisma && prisma py fetch && prisma db push --schema=schema.prisma
-    startCommand: cd api && uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: cd api && pip install -r requirements.txt && prisma generate --schema=schema.prisma && prisma db push --schema=schema.prisma
+    startCommand: cd api && prisma generate --schema=schema.prisma && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: '3.11'
